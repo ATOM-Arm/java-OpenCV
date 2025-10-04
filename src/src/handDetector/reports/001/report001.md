@@ -22,6 +22,19 @@ O objetivo principal foi identificar e rastrear mãos em tempo real a partir de 
 - Em cenários com fundo complexo ou iluminação inadequada, a precisão da detecção foi reduzida.
 - O tempo de processamento foi suficiente para aplicações em tempo real, com resposta visual imediata na interface.
 
+
+## Performance do Algoritmo
+
+O algoritmo de detecção apresentou desempenho satisfatório nos testes realizados, atendendo aos resultados esperados para a maioria dos cenários avaliados. A taxa de acerto foi consistente, com detecção eficiente das mãos em diferentes condições de iluminação e posicionamento. Pequenas variações de precisão foram observadas em situações de oclusão parcial, mas, de modo geral, o desempenho está alinhado com os objetivos do projeto.
+
+## Reconhecimento de Mãos e Gestos
+
+Além do reconhecimento eficiente das mãos, o algoritmo demonstrou capacidade satisfatória na identificação de gestos, ampliando as possibilidades de interação com o sistema. O reconhecimento de gestos foi testado em diferentes cenários, apresentando resultados promissores para comandos básicos.
+
+## Análise de Dados
+
+Para aprofundar a avaliação do desempenho, serão coletados e analisados dados quantitativos utilizando scripts em Python. Esses dados permitirão uma análise estatística detalhada dos resultados, identificando padrões e possíveis pontos de melhoria no algoritmo.
+
 ## Conclusão
 
 A implementação do algoritmo de detecção de mãos demonstrou ser eficiente para o controle do braço robótico via gestos, embora apresente limitações em condições adversas de iluminação e fundo.
@@ -31,6 +44,10 @@ A implementação do algoritmo de detecção de mãos demonstrou ser eficiente p
 - Aprimorar o pré-processamento das imagens para maior robustez em diferentes condições.
 - Explorar outros classificadores e técnicas de aprendizado de máquina para melhorar a precisão.
 - Integrar feedback visual mais detalhado para o usuário durante a operação.
+- Realizar testes adicionais com uma variedade maior de gestos e condições ambientais.
+- Coletar e analisar dados quantitativos para otimização contínua do algoritmo.
+- Analisar dados coletados para identificar áreas de melhoria e ajustar o algoritmo conforme necessário.
+- Gerar gráficos e relatórios detalhados para documentar o desempenho do sistema.
 
 
 ## Versão Atual do Código

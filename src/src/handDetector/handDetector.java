@@ -18,7 +18,7 @@ public class handDetector {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
     }
 
-    static String PATH = "src/src/handDetector/reports/";
+    static String PATH = "src/src/handDetector/reports/001/";
 
     public static void main(String[] args) {
         VideoCapture camera = new VideoCapture(0);
@@ -141,11 +141,19 @@ public class handDetector {
                     csvWriter.flush();
 
                     // Mostra na tela
-                    Imgproc.putText(frame,
+                    Imgproc.putText(
+                            frame,
                             "Dedos: " + fingerData.count + " - " + gesture,
                             new Point(20, 40),
                             Imgproc.FONT_HERSHEY_SIMPLEX,
                             1.0, new Scalar(0, 255, 0), 2);
+
+                    Imgproc.putText(
+                            frame,
+                            String.format("FPS: %.2f CPU: %.2f%% Mem: %.2f)", fps, cpuLoad * 100, usedMemoryMB),
+                            new Point(20, 80),
+                            Imgproc.FONT_HERSHEY_SIMPLEX,
+                            0.7, new Scalar(0, 255, 0), 2);
                 }
 
                 // Mostra apenas uma janela com o resultado final
