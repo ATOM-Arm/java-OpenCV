@@ -117,12 +117,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class handDetector {
+public class HandDetector {
     static {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
     }
 
-    static String PATH = "src/src/handDetector/reports/";
+    static String PATH = "src/src/HandDetector/reports/";
 
     public static void main(String[] args) {
         VideoCapture camera = new VideoCapture(0);
@@ -405,8 +405,8 @@ public class handDetector {
 ## 💡 Observações
 
 - O código utiliza recursos do Java para monitorar uso de CPU e memória.
-- O arquivo CSV é salvo em `src/src/handDetector/reports/csvs/`.
-- Snapshots são salvos em `src/src/handDetector/reports/media/`.
+- O arquivo CSV é salvo em `src/src/HandDetector/reports/csvs/`.
+- Snapshots são salvos em `src/src/HandDetector/reports/media/`.
 - Para encerrar, pressione `ESC`. Para salvar imagem, pressione `2`.
 - Certifique-se de que o OpenCV está corretamente instalado e configurado no seu ambiente Java.
 

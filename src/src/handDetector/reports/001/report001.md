@@ -61,7 +61,7 @@ import org.opencv.highgui.HighGui;
 import java.util.ArrayList;
 import java.util.List;
 
-public class handDetector {
+public class HandDetector {
     static { System.loadLibrary(Core.NATIVE_LIBRARY_NAME); }
 
     public static void main(String[] args) {

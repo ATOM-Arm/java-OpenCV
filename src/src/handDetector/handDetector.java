@@ -1,3 +1,4 @@
+
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
@@ -13,147 +14,59 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class handDetector {
+public class HandDetector {
     static {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
     }
 
-    static String PATH = "src/src/handDetector/reports/001/";
+    static String PATH = "src/src/HandDetector/reports/001/";
 
-    public static void main(String[] args) {
-        VideoCapture camera = new VideoCapture(0);
-        if (!camera.isOpened()) {
-            System.out.println("❌ Erro ao abrir a webcam.");
-            return;
-        }
+
+    public static void main(String[] args) throws IOException {
+
+        VideoCapture camera = createCamera(0);
 
         Mat frame = new Mat();
         Mat mask = new Mat();
         Mat hierarchy = new Mat();
 
-        // Inicializa o CSV
-        try (PrintWriter csvWriter = new PrintWriter(new FileWriter(PATH + "csvs/performance"+ (int) (Math.random() * 1000) + ".csv"))) {
+        try (PrintWriter csvWriter = new PrintWriter(new FileWriter(PATH + "csvs/performance" + (int) (Math.random() * 1000) + ".csv"))) {
             csvWriter.println("frame,fingers,maxContourArea,centerX,centerY,convexDefects,avgAngle,fps,usedMemoryMB,cpuLoad,gesture");
 
-            int frameNumber = 0; // Add this before the loop
+            int frameNumber = 0;
 
             while (true) {
                 long startTime = System.currentTimeMillis();
                 if (!camera.read(frame) || frame.empty()) break;
 
-                // Espelha a imagem (modo selfie)
-                Core.flip(frame, frame, 1);
+                processFrame(frame, mask, hierarchy);
 
-                // Suaviza ruídos
-                Imgproc.GaussianBlur(frame, frame, new Size(5, 5), 0);
+                int index = findLargestContourIndex(mask, hierarchy);
+                FingerData fingerData = new FingerData(0, 0);
+                String gesture = "";
+                double maxArea = 0, cx = 0, cy = 0;
+                int convexDefects = 0;
 
-                // Converte para YCrCb e aplica máscara para tons de pele
-                Mat ycrcb = new Mat();
-                Imgproc.cvtColor(frame, ycrcb, Imgproc.COLOR_BGR2YCrCb);
-                Core.inRange(ycrcb, new Scalar(0, 133, 77), new Scalar(255, 173, 127), mask);
-
-                // Limpeza morfológica
-                Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(5, 5));
-                Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, kernel);
-                Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel);
-
-                // Remoção de pequenos ruídos
-                Imgproc.medianBlur(mask, mask, 5);
-
-                // Encontra contornos
-                List<MatOfPoint> contours = new ArrayList<>();
-                Imgproc.findContours(mask.clone(), contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
-
-                double maxArea = 5000; // aumenta o filtro para ignorar pequenos contornos
-                int index = -1;
-                for (int i = 0; i < contours.size(); i++) {
-                    double area = Imgproc.contourArea(contours.get(i));
-                    if (area > maxArea) {
-                        maxArea = area;
-                        index = i;
-                    }
+                if (index != -1) {
+                    ContourInfo info = analyzeHand(frame, mask, hierarchy, index);
+                    fingerData = info.fingerData;
+                    gesture = info.gesture;
+                    maxArea = info.maxArea;
+                    cx = info.cx;
+                    cy = info.cy;
+                    convexDefects = info.convexDefects;
                 }
 
-                int fingers = 0;
-                String gesture = "";
+                double fps = calculateFPS(startTime);
+                double usedMemoryMB = getUsedMemoryMB();
+                double cpuLoad = getCpuLoad();
 
-                FingerData fingerData = new FingerData(0, 0);
                 if (index != -1) {
-                    MatOfPoint contour = contours.get(index);
-
-                    // Aproximação poligonal
-                    MatOfPoint2f contour2f = new MatOfPoint2f(contour.toArray());
-                    Imgproc.approxPolyDP(contour2f, contour2f, 3, true);
-                    MatOfPoint approxContour = new MatOfPoint();
-                    contour2f.convertTo(approxContour, CvType.CV_32S);
-
-                    Imgproc.drawContours(frame, contours, index, new Scalar(0, 255, 0), 2);
-
-                    // Convex Hull
-                    MatOfInt hull = new MatOfInt();
-                    Imgproc.convexHull(approxContour, hull);
-                    MatOfPoint hullPoints = hullPointsFromIndices(approxContour, hull);
-                    List<MatOfPoint> hullList = new ArrayList<>();
-                    hullList.add(hullPoints);
-                    Imgproc.drawContours(frame, hullList, 0, new Scalar(255, 0, 0), 2);
-
-                    // Convexity Defects
-                    MatOfInt4 defects = new MatOfInt4();
-                    Imgproc.convexityDefects(approxContour, hull, defects);
-
-                    fingerData = countFingers(defects, approxContour);
-
-                    // Atualiza o gesto
-                    gesture = classifyGesture(fingerData.count, approxContour, defects);
-
-                    // cálculo do centro
-                    Moments m = Imgproc.moments(contour);
-                    double cx = m.get_m10() / m.get_m00();
-                    double cy = m.get_m01() / m.get_m00();
-                    maxArea = Imgproc.contourArea(contour);
-                    int convexDefects = (int) defects.total(); // ou somente os válidos
-
-                    long endTime = System.currentTimeMillis();
-                    double fps = 1000.0 / (endTime - startTime);
-
-                    Runtime runtime = Runtime.getRuntime();
-                    double usedMemoryMB = (runtime.totalMemory() - runtime.freeMemory()) / 1024.0 / 1024.0;
-
-                    // CPU load
-                    com.sun.management.OperatingSystemMXBean osBean =
-                            (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-                    double cpuLoad = osBean.getProcessCpuLoad();
-
-                    // Escreve no CSV
-                    csvWriter.printf(Locale.US,"%d,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%.4f,%s%n",
-                            frameNumber++,
-                            fingerData.count,
-                            maxArea,
-                            cx,
-                            cy,
-                            convexDefects,
-                            fingerData.avgAngle,
-                            fps,
-                            usedMemoryMB,
-                            cpuLoad,
-                            gesture
-                    );
+                    csvWriter.printf(Locale.US, "%d,%d,%.2f,%.2f,%.2f,%d,%.2f,%.2f,%.2f,%.4f,%s%n",
+                            frameNumber++, fingerData.count, maxArea, cx, cy, convexDefects,
+                            fingerData.avgAngle, fps, usedMemoryMB, cpuLoad, gesture);
                     csvWriter.flush();
-
-                    // Mostra na tela
-                    Imgproc.putText(
-                            frame,
-                            "Dedos: " + fingerData.count + " - " + gesture,
-                            new Point(20, 40),
-                            Imgproc.FONT_HERSHEY_SIMPLEX,
-                            1.0, new Scalar(0, 255, 0), 2);
-
-                    Imgproc.putText(
-                            frame,
-                            String.format("FPS: %.2f CPU: %.2f%% Mem: %.2f)", fps, cpuLoad * 100, usedMemoryMB),
-                            new Point(20, 80),
-                            Imgproc.FONT_HERSHEY_SIMPLEX,
-                            0.7, new Scalar(0, 255, 0), 2);
+                    showTextOnScreen(frame, fingerData, gesture, fps, usedMemoryMB, cpuLoad);
                 }
 
                 // Mostra apenas uma janela com o resultado final
@@ -165,13 +78,12 @@ public class handDetector {
                     break;
                 } else if (key == 50) {
                     String filename = String.format(
-                            PATH+ "media/hand_snapshot_%03d.png",
+                            PATH + "media/hand_snapshot_%03d.png",
                             (int) (Math.random() * 1000)
                     );
                     saveImage(frame, filename);
                     System.out.println("📸 Imagem salva como " + filename);
                 }
-
             }
         } catch (IOException e) {
             System.out.println("Erro ao criar arquivo CSV: " + e.getMessage());
@@ -184,6 +96,48 @@ public class handDetector {
     }
 
     // ---------------- Funções auxiliares ----------------
+
+    public static VideoCapture createCamera(int index) {
+        VideoCapture camera = new VideoCapture(index);
+        if (!camera.isOpened()) {
+            System.out.println("❌ Erro ao abrir a webcam.");
+        }
+//        camera.set(Videoio.CAP_PROP_FRAME_WIDTH, 1280);
+//        camera.set(Videoio.CAP_PROP_FRAME_HEIGHT, 720);
+        return camera;
+    }
+
+    public static void showTextOnScreen(Mat frame, FingerData fingerData, String gesture, double fps, double usedMemoryMB, double cpuLoad) {
+        // Mostra na tela
+        Imgproc.putText(
+                frame,
+                "Dedos: " + fingerData.count + " - " + gesture,
+                new Point(20, 40),
+                Imgproc.FONT_HERSHEY_SIMPLEX,
+                1.0, new Scalar(0, 255, 0), 2);
+
+        Imgproc.putText(
+                frame,
+                String.format("FPS: %.2f CPU: %.2f%% Mem: %.2f)", fps, cpuLoad * 100, usedMemoryMB),
+                new Point(20, 80),
+                Imgproc.FONT_HERSHEY_SIMPLEX,
+                0.7, new Scalar(0, 0, 0), 4);
+        Imgproc.putText(
+                frame,
+                String.format("FPS: %.2f CPU: %.2f%% Mem: %.2f)", fps, cpuLoad * 100, usedMemoryMB),
+                new Point(20, 80),
+                Imgproc.FONT_HERSHEY_SIMPLEX,
+                0.7, new Scalar(255, 50, 50), 2);
+    }
+
+    public static void showTextOnScreen(Mat frame, int fingers, String gesture) {
+        Imgproc.putText(
+                frame,
+                "Dedos: " + fingers + " - " + gesture,
+                new Point(20, 40),
+                Imgproc.FONT_HERSHEY_SIMPLEX,
+                1.0, new Scalar(0, 255, 0), 2);
+    }
 
     private static MatOfPoint hullPointsFromIndices(MatOfPoint contour, MatOfInt hull) {
         Point[] contourPts = contour.toArray();
@@ -290,13 +244,107 @@ public class handDetector {
         System.out.println("Imagem salva como " + filename);
     }
 
-    private static class FingerData {
-        int count;
-        double avgAngle;
-
-        public FingerData(int count, double avgAngle) {
-            this.count = count;
-            this.avgAngle = avgAngle;
-        }
+    private static void processFrame(Mat frame, Mat mask, Mat hierarchy) {
+        Core.flip(frame, frame, 1);
+        Imgproc.GaussianBlur(frame, frame, new Size(5, 5), 0);
+        Mat ycrcb = new Mat();
+        Imgproc.cvtColor(frame, ycrcb, Imgproc.COLOR_BGR2YCrCb);
+        Core.inRange(ycrcb, new Scalar(0, 133, 77), new Scalar(255, 173, 127), mask);
+        Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(5, 5));
+        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, kernel);
+        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel);
+        Imgproc.medianBlur(mask, mask, 5);
     }
+
+    private static int findLargestContourIndex(Mat mask, Mat hierarchy) {
+        List<MatOfPoint> contours = new ArrayList<>();
+        Imgproc.findContours(mask.clone(), contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+        double maxArea = 5000;
+        int index = -1;
+        for (int i = 0; i < contours.size(); i++) {
+            double area = Imgproc.contourArea(contours.get(i));
+            if (area > maxArea) {
+                maxArea = area;
+                index = i;
+            }
+        }
+        return index;
+    }
+
+    public static ContourInfo analyzeHand(Mat frame, Mat mask, Mat hierarchy, int index) {
+        List<MatOfPoint> contours = new ArrayList<>();
+        Imgproc.findContours(mask.clone(), contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+        MatOfPoint contour = contours.get(index);
+        MatOfPoint2f contour2f = new MatOfPoint2f(contour.toArray());
+        Imgproc.approxPolyDP(contour2f, contour2f, 3, true);
+        MatOfPoint approxContour = new MatOfPoint();
+        contour2f.convertTo(approxContour, CvType.CV_32S);
+        Imgproc.drawContours(frame, contours, index, new Scalar(0, 255, 0), 2);
+        MatOfInt hull = new MatOfInt();
+        Imgproc.convexHull(approxContour, hull);
+        MatOfPoint hullPoints = hullPointsFromIndices(approxContour, hull);
+        List<MatOfPoint> hullList = new ArrayList<>();
+        hullList.add(hullPoints);
+        Imgproc.drawContours(frame, hullList, 0, new Scalar(255, 0, 0), 2);
+        MatOfInt4 defects = new MatOfInt4();
+        Imgproc.convexityDefects(approxContour, hull, defects);
+        FingerData fingerData = countFingers(defects, approxContour);
+        String gesture = classifyGesture(fingerData.count, approxContour, defects);
+        Moments m = Imgproc.moments(contour);
+        double cx = m.get_m10() / m.get_m00();
+        double cy = m.get_m01() / m.get_m00();
+        double maxArea = Imgproc.contourArea(contour);
+        int convexDefects = (int) defects.total();
+        return new ContourInfo(fingerData, gesture, maxArea, cx, cy, convexDefects, frame);
+    }
+
+    private static double calculateFPS(long startTime) {
+        long endTime = System.currentTimeMillis();
+        return 1000.0 / (endTime - startTime);
+    }
+
+    private static double getUsedMemoryMB() {
+        Runtime runtime = Runtime.getRuntime();
+        return (runtime.totalMemory() - runtime.freeMemory()) / 1024.0 / 1024.0;
+    }
+
+    private static double getCpuLoad() {
+        com.sun.management.OperatingSystemMXBean osBean =
+                (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+        return osBean.getProcessCpuLoad();
+    }
+
+    private static void saveSnapshot(Mat frame) {
+        String filename = String.format(PATH + "media/hand_snapshot_%03d.png", (int) (Math.random() * 1000));
+        saveImage(frame, filename);
+        System.out.println("📸 Imagem salva como " + filename);
+    }
+
+    public static ContourInfo analyzeImage(String imagePath, String csvPath) {
+        Mat frame = Imgcodecs.imread(imagePath);
+        if (frame.empty()) {
+            System.out.println("❌ Erro ao carregar imagem: " + imagePath);
+            return null;
+        }
+
+        Mat mask = new Mat();
+        Mat hierarchy = new Mat();
+
+        // pré-processamento
+        processFrame(frame, mask, hierarchy);
+
+        int index = findLargestContourIndex(mask, hierarchy);
+        if (index == -1) {
+            System.out.println("Nenhuma mão detectada em: " + imagePath);
+            return null;
+        }
+
+        // análise
+        ContourInfo info = analyzeHand(frame, mask, hierarchy, index);
+
+        return info;
+    }
+
+
+
 }
