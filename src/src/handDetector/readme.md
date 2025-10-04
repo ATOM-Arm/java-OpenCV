@@ -1,4 +1,4 @@
-# 📌 Documentação - Detecção de Mãos com OpenCV em Java
+_# 📌 Documentação - Detecção de Mãos com OpenCV em Java
 
 Este código implementa um **sistema de detecção e reconhecimento de gestos manuais** utilizando a biblioteca **OpenCV (Java bindings)**.
 
@@ -84,4 +84,4 @@ Converte os índices do **Convex Hull** em pontos reais do contorno.
 
 ---
 
-## 📊 Resultados Esperados
+## 📊 Resultados Esperados_
